@@ -15,6 +15,9 @@ import abc
 def awb_locus(x, a, b):
     return a / x + b
 
+def awb_locus2(x, a, b, c):
+    return a / (x * x) + b / x + c
+
 
 class Plane(object):
     _mint = 1800  # min color temperature
@@ -94,8 +97,9 @@ class XyPlane(Plane):
         u, v = uv.get_line()
         self._lineh, self._linev = self.get_value(u, v)
         Plane._illumName, self._illumh, self._illumv = self.get_xy_illum()
-        self._hlim = self._vlim = (0, 0.9)
-        self._hticks = self._vticks = np.arange(0, 1.0, 0.1)
+        self._hlim = (0.25, 0.55)
+        self._vlim = (0.25, 0.45)
+        self._hticks = self._vticks = np.arange(0.25, 0.55, 0.02)
         self._xlabel = 'x'
         self._ylabel = 'y'
 
@@ -118,9 +122,8 @@ class XyPlane(Plane):
                           0.34531, 0.38835, 0.32933, 0.35875, 0.37281, 0.35986,
                           0.37713, 0.40441]))
 
-    """
     @staticmethod
-    def get_xy_planckian():
+    def get_planckian_locus():
         BASET = 1667
         t1 = np.arange(BASET, 2223)
         x1 = (-0.2661239e9 / (t1 * t1 * t1) - 0.2343580e6 / (t1 * t1) +
@@ -139,7 +142,6 @@ class XyPlane(Plane):
               3.75112997 * x3 - 0.37001483)
         return (np.hstack((x1, x2, x3)), np.hstack((y1, y2, y3)),
                 np.hstack((t1, t2, t3)))
-    """
 
 
 class UvPlane(Plane):
@@ -263,7 +265,7 @@ class RgBgPlane(Plane):
         plt.scatter(self._illumh[8:], self._illumv[8:],
                     s=50, color="m", marker='*', label='F1-F12')
         popt, pcov = opt.curve_fit(awb_locus, self._illumh[[0, 3, 6]], self._illumv[[0, 3, 6]])
-        print("y = ", popt[0], " / x + ", popt[1])
+        print("In theory: y = ", popt[0], " / x + ", popt[1])
         x = np.linspace(0.3, 3.5, num=1000)
         y = awb_locus(x, popt[0], popt[1])
         x1 = x2 = y1 = y2 = 0.1
@@ -295,6 +297,7 @@ class GbGrPlane(Plane):
         gr = 1 / rg
         return gb, gr
 
+
 np.seterr(invalid='ignore')
 
 uv = UvPlane()
@@ -311,3 +314,53 @@ xy.draw()
 uv.draw()
 rgbg.draw()
 gbgr.draw()
+
+def draw_our_locus(x, y, title):
+    illum_x, illum_y = rgbg.get_illum()
+    """A, U40, U35, CWF, D50, D65 illuminant"""
+    illum_x = illum_x[[0, 19, 10, 9, 3, 5]]
+    illum_y = illum_y[[0, 19, 10, 9, 3, 5]]
+    plt.figure()
+    plt.title(title, fontsize=20)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.gca().set_aspect('equal')
+    plt.xlim(0, 5)
+    plt.ylim(0, 5)
+    plt.grid()
+    plt.xlabel('R / G', fontsize=24)
+    plt.ylabel('B / G', fontsize=24)
+    plt.xlim(0, 2)
+    plt.ylim(0, 1.5)
+    plt.scatter(illum_x, illum_y, color='b', marker='x')
+    plt.scatter(x, y, color='r', marker='x')
+    x = x[[0, 4, 5]]
+    y = y[[0, 4, 5]]
+    popt, pcov = opt.curve_fit(awb_locus, x, y)
+    print(title, ": y = ", popt[0], " / x + ", popt[1])
+    x = np.linspace(0.2, 2, num=1000)
+    y = awb_locus(x, popt[0], popt[1])
+    plt.plot(x, y)
+    x1 = x2 = y1 = y2 = 0.1
+    y = awb_locus(x + x1, popt[0], popt[1]) - y1
+    plt.plot(x, y)
+    y = awb_locus(x - x2, popt[0], popt[1]) + y2
+    plt.plot(x, y)
+    popt, pcov = opt.curve_fit(awb_locus2, x, y)
+    y = awb_locus2(x, popt[0], popt[1], popt[2])
+    plt.plot(x, y)
+    plt.savefig(title + '.png', format='png')
+    plt.show()
+
+x = np.array([1.0555555556, 1.0285714286, 0.9285714286, 0.6746987952, 0.6829268293, 0.6153846154])
+y = np.array([0.4027777778, 0.4428571429, 0.5595238095, 0.5180722892, 0.7682926829, 0.9230769231])
+title = 'OV9726'
+draw_our_locus(x, y, title)
+x = np.array([1.1279069767, 1.0752688172, 1, 0.7741935484, 0.7875, 0.7])
+y = np.array([0.4418604651, 0.4516129032, 0.5421686747, 0.5322580645, 0.725, 0.88])
+title = 'MI1040'
+draw_our_locus(x, y, title)
+x = np.array([1.3058823529, 1.2567567568, 1.1648351648, 0.8734177215, 0.8846153846, 0.7714285714])
+y = np.array([0.3882352941, 0.4054054054, 0.4945054945, 0.4683544304, 0.6442307692, 0.7857142857])
+title = 'S5K6A1'
+draw_our_locus(x, y, title)
