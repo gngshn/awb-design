@@ -24,7 +24,7 @@ class Plane(object):
     _maxt = 15000  # max color temperature
     _step = 50  # color temperature step
     _th = 0.01  # rg & bg min threshold
-    _duv = (-0.012, 0.012, -0.018, 0.006)  # max delta uv for all illuminant
+    _duv = (-0.012, 0.012, -0.016, 0.008)  # max delta uv for all illuminant
 
     _t = ()
     _index = ()
@@ -191,8 +191,9 @@ class UvPlane(Plane):
         v = 6 * y / (12 * y - 2 * x + 3)
         return u, v
 
-    def get_planckian_locus(self):
-        t = np.arange(1000, 15001)
+    @staticmethod
+    def get_planckian_locus():
+        t = np.arange(1000, 15000 + 1)
         u = ((0.860117757 + 1.54118254e-4 * t + 1.28641212e-7 * t * t) /
              (1 + 8.42420235e-4 * t + 7.08145163e-7 * t * t))
         v = ((0.317398726 + 4.22806245e-5 * t + 4.20481691e-8 * t * t) /
@@ -264,7 +265,8 @@ class RgBgPlane(Plane):
                     s=100, color="c", marker=',', label='D50556575')
         plt.scatter(self._illumh[8:], self._illumv[8:],
                     s=50, color="m", marker='*', label='F1-F12')
-        popt, pcov = opt.curve_fit(awb_locus, self._illumh[[0, 3, 6]], self._illumv[[0, 3, 6]])
+        popt, pcov = opt.curve_fit(awb_locus, self._illumh[[0, 3, 6]],
+                                   self._illumv[[0, 3, 6]])
         print("In theory: y = ", popt[0], " / x + ", popt[1])
         x = np.linspace(0.3, 3.5, num=1000)
         y = awb_locus(x, popt[0], popt[1])
@@ -298,6 +300,99 @@ class GbGrPlane(Plane):
         return gb, gr
 
 
+def draw_our_locus(x, y, title):
+    illum_x, illum_y = rgbg.get_illum()
+    """A, U40, U35, CWF, D50, D65 illuminant"""
+    illum_x = illum_x[[0, 19, 10, 9, 3, 5]]
+    illum_y = illum_y[[0, 19, 10, 9, 3, 5]]
+
+    plt.figure()
+    plt.title(title, fontsize=20)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.gca().set_aspect('equal')
+    plt.grid()
+    plt.xlabel('R / G', fontsize=24)
+    plt.ylabel('B / G', fontsize=24)
+    plt.xlim(0, 2)
+    plt.ylim(0, 1.5)
+    plt.scatter(illum_x, illum_y, color='b', marker='x')
+    plt.scatter(x, y, color='r', marker='x')
+    x = x[[0, 1, 2, 4, 5]]
+    y = y[[0, 1, 2, 4, 5]]
+    xbak = x
+    ybak = y
+    popt, pcov = opt.curve_fit(awb_locus, x, y)
+    print(title, ": y = ", popt[0], " / x + ", popt[1])
+    x = np.linspace(0.2, 5, num=1000)
+    y = awb_locus(x, popt[0], popt[1])
+    plt.plot(x, y)
+    x1 = x2 = y1 = y2 = 0.1
+    y = awb_locus(x + x1, popt[0], popt[1]) - y1
+    plt.plot(x, y)
+    y = awb_locus(x - x2, popt[0], popt[1]) + y2
+    plt.plot(x, y)
+    popt, pcov = opt.curve_fit(awb_locus2, xbak, ybak)
+    y = awb_locus2(x, popt[0], popt[1], popt[2])
+    plt.plot(x, y)
+    plt.savefig(title + '.png', format='png')
+    plt.show()
+
+def draw_sensor_awb_locus():
+    title = 'OV9726'
+    x = np.array([1.0555555556, 1.0285714286, 0.9285714286,
+                  0.6746987952, 0.6829268293, 0.6153846154])
+    y = np.array([0.4027777778, 0.4428571429, 0.5595238095,
+                  0.5180722892, 0.7682926829, 0.9230769231])
+    draw_our_locus(x, y, title)
+
+    title = 'MI1040'
+    x = np.array([1.1279069767, 1.0752688172, 1,
+                  0.7741935484, 0.7875, 0.7])
+    y = np.array([0.4418604651, 0.4516129032, 0.5421686747,
+                  0.5322580645, 0.725, 0.88])
+    draw_our_locus(x, y, title)
+
+    title = 'S5K6A1'
+    x = np.array([1.3058823529, 1.2567567568, 1.1648351648,
+                  0.8734177215, 0.8846153846, 0.7714285714])
+    y = np.array([0.3882352941, 0.4054054054, 0.4945054945,
+                  0.4683544304, 0.6442307692, 0.7857142857])
+    draw_our_locus(x, y, title)
+
+def draw_daylight_cct_locus():
+    """
+    daylight cct:
+    4000 4100 4200 4300 4400 4500 4600 4700 4800 4900 5000 5100 5200 5300 5400
+    5500 5600 5700 5800 5900 6000 6100 6200 6300 6400 6500 6600 6700 6800 6900
+    7000 7100 7200 7300 7400 7500 7600 7700 7800 7900 8000 8100 8200 8300 8400
+    8500 9000 9500 10000 11000 12000 13000 14000 15000 20000 25000
+    """
+    x1 = np.array([0.3823, 0.3779, 0.3737, 0.3697, 0.3658, 0.3621, 0.3585,
+                   0.3551, 0.3519, 0.3487, 0.3457, 0.3429, 0.3401, 0.3375,
+                   0.3349, 0.3325, 0.3302, 0.3279, 0.3258, 0.3237, 0.3217,
+                   0.3198, 0.3179, 0.3161, 0.3144, 0.3128, 0.3112, 0.3097,
+                   0.3082, 0.3067, 0.3054, 0.304, 0.3027, 0.3015, 0.3003,
+                   0.2991, 0.298, 0.2969, 0.2958, 0.2948, 0.2938, 0.2928,
+                   0.2919, 0.291, 0.2901, 0.2892, 0.2853, 0.2818, 0.2788,
+                   0.2737, 0.2697, 0.2664, 0.2637, 0.2614, 0.2539, 0.2499])
+    y1 = np.array([0.3838, 0.3812, 0.3786, 0.376, 0.3734, 0.3709, 0.3684,
+                   0.3659, 0.3634, 0.361, 0.3587, 0.3564, 0.3541, 0.3519,
+                   0.3497, 0.3476, 0.3455, 0.3435, 0.3416, 0.3397, 0.3378,
+                   0.336, 0.3342, 0.3325, 0.3308, 0.3292, 0.3276, 0.326,
+                   0.3245, 0.3231, 0.3216, 0.3202, 0.3189, 0.3176, 0.3163,
+                   0.315, 0.3138, 0.3126, 0.3115, 0.3103, 0.3092, 0.3081,
+                   0.3071, 0.3061, 0.3051, 0.3041, 0.2996, 0.2956, 0.292,
+                   0.2858, 0.2808, 0.2767, 0.2732, 0.2702, 0.2603, 0.2548])
+    x2, y2 = xy.get_line()
+    x3, y3 = xy.get_illum()
+    plt.figure()
+    plt.plot(x1, y1)
+    plt.plot(x2, y2)
+    plt.scatter(x3, y3, s=20, marker='o')
+    plt.savefig('daylight.png', format='png')
+    plt.show()
+
 np.seterr(invalid='ignore')
 
 uv = UvPlane()
@@ -310,57 +405,10 @@ xy.calc_cct(uv)
 rgbg.calc_cct(xy)
 gbgr.calc_cct(rgbg)
 
-xy.draw()
 uv.draw()
+xy.draw()
 rgbg.draw()
 gbgr.draw()
 
-def draw_our_locus(x, y, title):
-    illum_x, illum_y = rgbg.get_illum()
-    """A, U40, U35, CWF, D50, D65 illuminant"""
-    illum_x = illum_x[[0, 19, 10, 9, 3, 5]]
-    illum_y = illum_y[[0, 19, 10, 9, 3, 5]]
-    plt.figure()
-    plt.title(title, fontsize=20)
-    plt.xticks(fontsize=18)
-    plt.yticks(fontsize=18)
-    plt.gca().set_aspect('equal')
-    plt.xlim(0, 5)
-    plt.ylim(0, 5)
-    plt.grid()
-    plt.xlabel('R / G', fontsize=24)
-    plt.ylabel('B / G', fontsize=24)
-    plt.xlim(0, 2)
-    plt.ylim(0, 1.5)
-    plt.scatter(illum_x, illum_y, color='b', marker='x')
-    plt.scatter(x, y, color='r', marker='x')
-    x = x[[0, 4, 5]]
-    y = y[[0, 4, 5]]
-    popt, pcov = opt.curve_fit(awb_locus, x, y)
-    print(title, ": y = ", popt[0], " / x + ", popt[1])
-    x = np.linspace(0.2, 2, num=1000)
-    y = awb_locus(x, popt[0], popt[1])
-    plt.plot(x, y)
-    x1 = x2 = y1 = y2 = 0.1
-    y = awb_locus(x + x1, popt[0], popt[1]) - y1
-    plt.plot(x, y)
-    y = awb_locus(x - x2, popt[0], popt[1]) + y2
-    plt.plot(x, y)
-    popt, pcov = opt.curve_fit(awb_locus2, x, y)
-    y = awb_locus2(x, popt[0], popt[1], popt[2])
-    plt.plot(x, y)
-    plt.savefig(title + '.png', format='png')
-    plt.show()
-
-x = np.array([1.0555555556, 1.0285714286, 0.9285714286, 0.6746987952, 0.6829268293, 0.6153846154])
-y = np.array([0.4027777778, 0.4428571429, 0.5595238095, 0.5180722892, 0.7682926829, 0.9230769231])
-title = 'OV9726'
-draw_our_locus(x, y, title)
-x = np.array([1.1279069767, 1.0752688172, 1, 0.7741935484, 0.7875, 0.7])
-y = np.array([0.4418604651, 0.4516129032, 0.5421686747, 0.5322580645, 0.725, 0.88])
-title = 'MI1040'
-draw_our_locus(x, y, title)
-x = np.array([1.3058823529, 1.2567567568, 1.1648351648, 0.8734177215, 0.8846153846, 0.7714285714])
-y = np.array([0.3882352941, 0.4054054054, 0.4945054945, 0.4683544304, 0.6442307692, 0.7857142857])
-title = 'S5K6A1'
-draw_our_locus(x, y, title)
+draw_daylight_cct_locus()
+draw_sensor_awb_locus()
