@@ -265,8 +265,11 @@ class RgBgPlane(Plane):
                     s=100, color="c", marker=',', label='D50556575')
         plt.scatter(self._illumh[8:], self._illumv[8:],
                     s=50, color="m", marker='*', label='F1-F12')
-        popt, pcov = opt.curve_fit(awb_locus, self._illumh[[0, 3, 6]],
-                                   self._illumv[[0, 3, 6]])
+        popt, pcov =opt.curve_fit(awb_locus,
+                                  self._illumh[[0, 3, 4, 5, 6, 9,
+                                                14, 15, 17, 19]],
+                                  self._illumv[[0, 3, 4, 5, 6, 9,
+                                                14, 15, 17, 19]])
         print("In theory: y = ", popt[0], " / x + ", popt[1])
         x = np.linspace(0.3, 3.5, num=1000)
         y = awb_locus(x, popt[0], popt[1])
@@ -305,7 +308,6 @@ def draw_our_locus(x, y, title):
     """A, U40, U35, CWF, D50, D65 illuminant"""
     illum_x = illum_x[[0, 19, 10, 9, 3, 5]]
     illum_y = illum_y[[0, 19, 10, 9, 3, 5]]
-
     plt.figure()
     plt.title(title, fontsize=20)
     plt.xticks(fontsize=18)
