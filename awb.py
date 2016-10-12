@@ -265,17 +265,19 @@ class RgBgPlane(Plane):
                     s=100, color="c", marker=',', label='D50556575')
         plt.scatter(self._illumh[8:], self._illumv[8:],
                     s=50, color="m", marker='*', label='F1-F12')
-        popt, pcov =opt.curve_fit(awb_locus,
-                                  self._illumh[[0, 3, 4, 5, 6, 9,
-                                                14, 15, 17, 19]],
-                                  self._illumv[[0, 3, 4, 5, 6, 9,
-                                                14, 15, 17, 19]])
+        popt, pcov = opt.curve_fit(awb_locus,
+                                   self._illumh[[0, 3, 4, 5, 6, 9,
+                                                 14, 15, 17, 19]],
+                                   self._illumv[[0, 3, 4, 5, 6, 9,
+                                                 14, 15, 17, 19]])
         print("In theory: y = ", popt[0], " / x + ", popt[1])
         x = np.linspace(0.3, 3.5, num=1000)
         y = awb_locus(x, popt[0], popt[1])
-        x1 = x2 = y1 = y2 = 0.1
-        y1 = awb_locus(x + x1, popt[0], popt[1]) - y1
-        y2 = awb_locus(x - x2, popt[0], popt[1]) + y2
+        x1 = x2 = y1 = y2 = 0
+        a1 = 0.80
+        a2 = 1.25
+        y1 = awb_locus(x + x1, a1 * popt[0], popt[1]) - y1
+        y2 = awb_locus(x - x2, a2 * popt[0], popt[1]) + y2
         plt.plot(x, y)
         plt.plot(x, y1)
         plt.plot(x, y2)
@@ -316,8 +318,10 @@ def draw_our_locus(x, y, title):
     plt.grid()
     plt.xlabel('R / G', fontsize=24)
     plt.ylabel('B / G', fontsize=24)
-    plt.xlim(0, 2)
-    plt.ylim(0, 1.5)
+    plt.gca().set_xticks(np.arange(0, 3, 0.5))
+    plt.gca().set_yticks(np.arange(-0.5, 2, 0.5))
+    plt.xlim(0, 3)
+    plt.ylim(-0.5, 2)
     plt.scatter(illum_x, illum_y, color='b', marker='x')
     plt.scatter(x, y, color='r', marker='x')
     x = x[[0, 1, 2, 4, 5]]
@@ -326,17 +330,19 @@ def draw_our_locus(x, y, title):
     ybak = y
     popt, pcov = opt.curve_fit(awb_locus, x, y)
     print(title, ": y = ", popt[0], " / x + ", popt[1])
-    x = np.linspace(0.2, 5, num=1000)
+    x = np.linspace(0.11, 5, num=1000)
     y = awb_locus(x, popt[0], popt[1])
     plt.plot(x, y)
-    x1 = x2 = y1 = y2 = 0.1
-    y = awb_locus(x + x1, popt[0], popt[1]) - y1
+    x1 = x2 = y1 = y2 = 0
+    a1 = 0.80
+    a2 = 1.25
+    y = awb_locus(x + x1, a1 * popt[0], popt[1]) - y1
     plt.plot(x, y)
-    y = awb_locus(x - x2, popt[0], popt[1]) + y2
+    y = awb_locus(x - x2, a2 * popt[0], popt[1]) + y2
     plt.plot(x, y)
-    popt, pcov = opt.curve_fit(awb_locus2, xbak, ybak)
-    y = awb_locus2(x, popt[0], popt[1], popt[2])
-    plt.plot(x, y)
+#    popt, pcov = opt.curve_fit(awb_locus2, xbak, ybak)
+#    y = awb_locus2(x, popt[0], popt[1])
+#    plt.plot(x, y)
     plt.savefig(title + '.png', format='png')
     plt.show()
 
@@ -409,8 +415,8 @@ gbgr.calc_cct(rgbg)
 
 uv.draw()
 xy.draw()
-rgbg.draw()
 gbgr.draw()
+rgbg.draw()
 
 draw_daylight_cct_locus()
 draw_sensor_awb_locus()
