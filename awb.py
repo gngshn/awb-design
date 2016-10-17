@@ -278,7 +278,7 @@ class RgBgPlane(Plane):
         a2 = 1.25
         y1 = awb_locus(x + x1, a1 * popt[0], popt[1]) - y1
         y2 = awb_locus(x - x2, a2 * popt[0], popt[1]) + y2
-        plt.plot(x, y)
+        plt.plot(x, y, '--')
         plt.plot(x, y1)
         plt.plot(x, y2)
         plt.savefig(self.__class__.__name__ + '.png', format='png')
@@ -332,7 +332,7 @@ def draw_our_locus(x, y, title):
     print(title, ": y = ", popt[0], " / x + ", popt[1])
     x = np.linspace(0.11, 5, num=1000)
     y = awb_locus(x, popt[0], popt[1])
-    plt.plot(x, y)
+    plt.plot(x, y, '--')
     x1 = x2 = y1 = y2 = 0
     a1 = 0.80
     a2 = 1.25
@@ -340,9 +340,6 @@ def draw_our_locus(x, y, title):
     plt.plot(x, y)
     y = awb_locus(x - x2, a2 * popt[0], popt[1]) + y2
     plt.plot(x, y)
-#    popt, pcov = opt.curve_fit(awb_locus2, xbak, ybak)
-#    y = awb_locus2(x, popt[0], popt[1])
-#    plt.plot(x, y)
     plt.savefig(title + '.png', format='png')
     plt.show()
 
