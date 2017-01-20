@@ -7,12 +7,14 @@ import scipy.optimize as opt
 import abc
 
 
-def awb_locus(x, a, b):
-    return a / x + b
-
-
 def awb_locus2(x, a, b, c):
     return a / (x + b) + c
+
+
+# noinspection SpellCheckingInspection,PyUnusedLocal
+def save_figure(name):
+    # plt.savefig(name, format='png')
+    pass
 
 
 class Plane(object):
@@ -69,7 +71,7 @@ class Plane(object):
                 plt.plot(self._cct_h[i, :], self._cct_v[i, :], color="blue",
                          linewidth=0.5)
             i += 1
-        # noinspection PyTypeChecker
+        # noinspection PyTypeChecker,SpellCheckingInspection
         plt.scatter(self._illuminant_h[[0, 1, 2, 7]],
                     self._illuminant_v[[0, 1, 2, 7]],
                     s=100, color="y", marker='o', label='ABCE')
@@ -77,7 +79,7 @@ class Plane(object):
                     s=100, color="c", marker=',', label='D50556575')
         plt.scatter(self._illuminant_h[8:], self._illuminant_v[8:],
                     s=50, color="m", marker='*', label='F1-F12')
-        # plt.savefig(self.__class__.__name__ + '.png', format='png')
+        save_figure(self.__class__.__name__ + '.png')
         plt.show()
 
     @staticmethod
@@ -86,7 +88,7 @@ class Plane(object):
 
     @abc.abstractmethod
     def get_value(self, h, v):
-        """Method that should do something."""
+        pass
 
 
 class XyPlane(Plane):
@@ -237,7 +239,7 @@ class RgBgPlane(Plane):
         return rg, bg
 
     def draw(self):
-        plt.figure(figsize=(16, 12))
+        plt.figure()
         plt.gca().set_xticks(self._h_ticks)
         plt.gca().set_yticks(self._v_ticks)
         plt.xticks(fontsize=18)
@@ -266,26 +268,28 @@ class RgBgPlane(Plane):
                     s=100, color="c", marker=',', label='D50556575')
         plt.scatter(self._illuminant_h[8:], self._illuminant_v[8:],
                     s=50, color="m", marker='*', label='F1-F12')
-        # noinspection PyUnresolvedReferences
-        p_opt, p_cov = opt.curve_fit(awb_locus,
+        # noinspection PyUnresolvedReferences,PyTypeChecker
+        p_opt, p_cov = opt.curve_fit(awb_locus2,
                                      self._illuminant_h[[0, 3, 4, 5, 6, 9,
                                                          14, 15, 17, 19]],
                                      self._illuminant_v[[0, 3, 4, 5, 6, 9,
-                                                         14, 15, 17, 19]])
-        print("In theory: y = ", p_opt[0], " / x + ", p_opt[1])
+                                                         14, 15, 17, 19]],
+                                     p0=(1, 0, 0))
+        print("In theory: y = %.5f / (x - %.5f) + %.5f\n" %
+              (p_opt[0], -p_opt[1], p_opt[2]))
         x = np.linspace(0.3, 3.5, num=1000)
-        y = awb_locus(x, p_opt[0], p_opt[1])
+        y = awb_locus2(x, p_opt[0], p_opt[1], p_opt[2])
         x1 = x2 = y1 = y2 = 0
         a1 = 0.70
         a2 = 1 / a1
         # noinspection PyTypeChecker
-        y1 = awb_locus(x + x1, a1 * p_opt[0], p_opt[1]) - y1
+        y1 = awb_locus2(x + x1, a1 * p_opt[0], p_opt[1], p_opt[2]) - y1
         # noinspection PyTypeChecker
-        y2 = awb_locus(x - x2, a2 * p_opt[0], p_opt[1]) + y2
+        y2 = awb_locus2(x - x2, a2 * p_opt[0], p_opt[1], p_opt[2]) + y2
         plt.plot(x, y, '--')
         plt.plot(x, y1)
         plt.plot(x, y2)
-        # plt.savefig(self.__class__.__name__ + '.png', format='png')
+        save_figure(self.__class__.__name__ + '.png')
         plt.show()
 
 
@@ -309,7 +313,7 @@ class GbGrPlane(Plane):
         return gb, gr
 
 
-def draw_our_locus(rgbg, x, y, title):
+def draw_our_locus(rgbg, x, y, title, a):
     illuminant_x, illuminant_y = rgbg.get_illuminant()
     """A, U40, U35, CWF, D50, D65 illuminant"""
     illuminant_x = illuminant_x[[0, 19, 10, 9, 3, 5]]
@@ -331,55 +335,43 @@ def draw_our_locus(rgbg, x, y, title):
     x = x[[0, 1, 2, 4, 5]]
     y = y[[0, 1, 2, 4, 5]]
     plt.scatter(x, y, color='g', marker='x')
-    p_opt, p_cov = opt.curve_fit(awb_locus, x, y)
-    print(title, ": y = ", p_opt[0], " / x + ", p_opt[1])
-    x = np.linspace(0.11, 5, num=1000)
-    y = awb_locus(x, p_opt[0], p_opt[1])
+    # noinspection PyTypeChecker
+    p_opt, p_cov = opt.curve_fit(awb_locus2, x, y, p0=(1, 0, 0))
+    print("%s: y = %.5f / (x - %.5f) + %.5f\n" %
+          (title, p_opt[0], -p_opt[1], p_opt[2]))
+    x = np.linspace(0.001 - p_opt[1], 5, num=1000)
+    y = awb_locus2(x, p_opt[0], p_opt[1], p_opt[2])
     plt.plot(x, y, '--')
     x1 = x2 = y1 = y2 = 0
-    a1 = 0.70
+    a1 = a
     a2 = 1 / a1
+    x = np.linspace(0.001 - p_opt[1] + x1, 5, num=1000)
     # noinspection PyTypeChecker
-    y = awb_locus(x + x1, a1 * p_opt[0], p_opt[1]) - y1
+    y = awb_locus2(x + x1, a1 * p_opt[0], p_opt[1], p_opt[2]) - y1
     plt.plot(x, y)
+    x = np.linspace(0.001 - p_opt[1] + x2, 5, num=1000)
     # noinspection PyTypeChecker
-    y = awb_locus(x - x2, a2 * p_opt[0], p_opt[1]) + y2
+    y = awb_locus2(x - x2, a2 * p_opt[0], p_opt[1], p_opt[2]) + y2
     plt.plot(x, y)
-    # plt.savefig(title + '.png', format='png')
+    save_figure(title + '.png')
     plt.show()
 
 
-def draw_sensor_awb_locus(rgbg):
-    title = 'OV9726'
-    x = np.array([1.0555555556, 1.0285714286, 0.9285714286,
-                  0.6746987952, 0.6829268293, 0.6153846154])
-    y = np.array([0.4027777778, 0.4428571429, 0.5595238095,
-                  0.5180722892, 0.7682926829, 0.9230769231])
-    draw_our_locus(rgbg, x, y, title)
-
-    title = 'MI1040'
-    x = np.array([1.1279069767, 1.0752688172, 1,
-                  0.7741935484, 0.7875, 0.7])
-    y = np.array([0.4418604651, 0.4516129032, 0.5421686747,
-                  0.5322580645, 0.725, 0.88])
-    draw_our_locus(rgbg, x, y, title)
-
-    title = 'S5K6A1'
-    x = np.array([1.3058823529, 1.2567567568, 1.1648351648,
-                  0.8734177215, 0.8846153846, 0.7714285714])
-    y = np.array([0.3882352941, 0.4054054054, 0.4945054945,
-                  0.4683544304, 0.6442307692, 0.7857142857])
-    draw_our_locus(rgbg, x, y, title)
-
+def draw_sensor_awb_locus2(rgbg):
     title = 'OV9732'
     x = np.array([32 / 39, 32 / 39, 32 / 66, 32 / 50, 32 / 54, 32 / 62])
     y = np.array([32 / 74, 32 / 73, 32 / 40, 32 / 66, 32 / 52, 32 / 46])
-    draw_our_locus(rgbg, x, y, title)
+    draw_our_locus(rgbg, x, y, title, 0.8)
 
     title = 'OV2710'
     x = np.array([32 / 26, 32 / 29, 32 / 47, 32 / 37, 32 / 40, 32 / 46])
     y = np.array([32 / 73, 32 / 69, 32 / 43, 32 / 71, 32 / 53, 32 / 46])
-    draw_our_locus(rgbg, x, y, title)
+    draw_our_locus(rgbg, x, y, title, 0.75)
+
+    title = 'OV2710'
+    x = np.array([32 / 33, 32 / 31, 32 / 54, 32 / 40, 32 / 43, 32 / 51])
+    y = np.array([32 / 96, 32 / 94, 32 / 42, 32 / 71, 32 / 53, 32 / 45])
+    draw_our_locus(rgbg, x, y, title, 0.9)
 
 
 def draw_daylight_cct_locus(xy):
@@ -412,7 +404,7 @@ def draw_daylight_cct_locus(xy):
     plt.plot(x1, y1)
     plt.plot(x2, y2)
     plt.scatter(x3, y3, s=20, marker='o')
-    # plt.savefig('daylight.png', format='png')
+    save_figure('daylight.png')
     plt.show()
 
 
@@ -440,7 +432,7 @@ def draw_illuminant_box(xy, rgbg):
     illuminant_x = illuminant_x[[5, 3, 9, 19, 0]]
     illuminant_y = illuminant_y[[5, 3, 9, 19, 0]]
     plt.scatter(illuminant_x, illuminant_y, color='b', marker='o')
-    # plt.savefig('our_xy.png', format='png')
+    save_figure('our_xy.png')
     plt.show()
 
     plt.figure()
@@ -464,114 +456,23 @@ def draw_illuminant_box(xy, rgbg):
         i += 1
     plt.scatter(my_illuminant_rg, my_illuminant_bg, color='r', marker='x')
     plt.scatter(illuminant_rg, illuminant_bg, color='b', marker='o')
-    # plt.savefig('our_rgbg.png', format='png')
+    save_figure('our_rgbg.png')
     plt.show()
 
 
-class LocusAb(object):
-    @staticmethod
-    def draw_our_locus1(rgbg, rg, bg, title):
-        plt.figure()
-        plt.title(title, fontsize=20)
-        plt.xticks(fontsize=18)
-        plt.yticks(fontsize=18)
-        plt.gca().set_aspect('equal')
-        plt.grid()
-        plt.xlabel('R / G', fontsize=24)
-        plt.ylabel('B / G', fontsize=24)
-        plt.gca().set_xticks(np.arange(-1, 5, 0.5))
-        plt.gca().set_yticks(np.arange(-1, 5, 0.5))
-        plt.xlim(-1, 5)
-        plt.ylim(-1, 5)
-        illuminant_x, illuminant_y = rgbg.get_illuminant()
-        illuminant_x = illuminant_x[[0, 19, 3, 5, 6]]
-        illuminant_y = illuminant_y[[0, 19, 3, 5, 6]]
-        plt.scatter(illuminant_x, illuminant_y, color='b', marker='x')
-        rg = rg[[0, 1, 4, 5, 2]]
-        bg = bg[[0, 1, 4, 5, 2]]
-        plt.scatter(rg, bg, color='g', marker='x')
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus, rg, bg, p0=(1, 0))
-        h = np.linspace(0.0001, 5, num=1000)
-        v = awb_locus(h, p_opt[0], p_opt[1])
-        plt.plot(h, v, color='g')
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus, illuminant_x, illuminant_y,
-                                     p0=(1, 0))
-        v = awb_locus(h, p_opt[0], p_opt[1])
-        plt.plot(h, v, color='b')
-        plt.show()
-
-    @staticmethod
-    def draw_minus_locus1(rgbg, rg, bg, title):
-        illuminant_x, illuminant_y = rgbg.get_illuminant()
-        illuminant_x = illuminant_x[[0, 19, 3, 5, 6]]
-        illuminant_y = illuminant_y[[0, 19, 3, 5, 6]]
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus, illuminant_x, illuminant_y,
-                                     p0=(1, 0))
-        illuminant_y -= p_opt[1]
-        plt.figure()
-        plt.title(title, fontsize=20)
-        plt.xticks(fontsize=18)
-        plt.yticks(fontsize=18)
-        plt.gca().set_aspect('equal')
-        plt.grid()
-        plt.xlabel('R / G', fontsize=24)
-        plt.ylabel('B / G', fontsize=24)
-        plt.gca().set_xticks(np.arange(-1, 5, 0.5))
-        plt.gca().set_yticks(np.arange(-1, 5, 0.5))
-        plt.xlim(-1, 5)
-        plt.ylim(-1, 5)
-        plt.scatter(illuminant_x, illuminant_y, color='b', marker='x')
-        rg = rg[[0, 1, 4, 5, 2]]
-        bg = bg[[0, 1, 4, 5, 2]]
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus, rg, bg, p0=(1, 0))
-        bg -= p_opt[1]
-        plt.scatter(rg, bg, color='g', marker='x')
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus, rg, bg, p0=(1, 0))
-        h = np.linspace(0.0001, 5, num=1000)
-        v = awb_locus(h, p_opt[0], p_opt[1])
-        plt.plot(h, v, color='g')
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus, illuminant_x, illuminant_y,
-                                     p0=(1, 0))
-        v = awb_locus(h, p_opt[0], p_opt[1])
-        plt.plot(h, v, color='b')
-        # noinspection SpellCheckingInspection
-        colors = "rgbyc"
-        h = np.linspace(-1, 5, num=1000)
-        for i in range(5):
-            plt.scatter(rg[i], bg[i], color=colors[i])
-            plt.scatter(illuminant_x[i], illuminant_y[i], color=colors[i])
-            k = (illuminant_y[i] - bg[i]) / (illuminant_x[i] - rg[i])
-            # noinspection PyUnresolvedReferences
-            v = k * (h - rg[i]) + bg[i]
-            plt.plot(h, v)
-        plt.show()
-
-    @staticmethod
-    def main(rgbg):
-        title = 'OV9732 & theory diff'
-        x = np.array([32 / 39, 32 / 39, 32 / 66, 32 / 50, 32 / 54, 32 / 62])
-        y = np.array([32 / 74, 32 / 73, 32 / 40, 32 / 66, 32 / 52, 32 / 46])
-        LocusAb.draw_our_locus1(rgbg, x, y, title)
-        LocusAb.draw_minus_locus1(rgbg, x, y, title)
-        title = 'OV2710 & theory diff'
-        x = np.array([32 / 26, 32 / 29, 32 / 47, 32 / 37, 32 / 40, 32 / 46])
-        y = np.array([32 / 73, 32 / 69, 32 / 43, 32 / 71, 32 / 53, 32 / 46])
-        LocusAb.draw_our_locus1(rgbg, x, y, title)
-        LocusAb.draw_minus_locus1(rgbg, x, y, title)
-        title = 'AR0237 & theory diff'
-        x = np.array([32 / 33, 32 / 31, 32 / 54, 32 / 40, 32 / 43, 32 / 51])
-        y = np.array([32 / 96, 32 / 94, 32 / 42, 32 / 71, 32 / 53, 32 / 45])
-        LocusAb.draw_our_locus1(rgbg, x, y, title)
-        LocusAb.draw_minus_locus1(rgbg, x, y, title)
-
-
+# noinspection SpellCheckingInspection
+"""
 class LocusAbc(object):
+    def __init__(self):
+        illuminant_x, illuminant_y = rgbg.get_illuminant()
+        illuminant_x = illuminant_x[[0, 19, 3, 5, 6]]
+        illuminant_y = illuminant_y[[0, 19, 3, 5, 6]]
+        # noinspection PyTypeChecker
+        p_opt, p_cov = opt.curve_fit(awb_locus2, illuminant_x, illuminant_y,
+                                     p0=(1, 0, 0))
+        illuminant_x += p_opt[1]
+        illuminant_y -= p_opt[2]
+
     @staticmethod
     def draw_our_locus2(rgbg, rg, bg, title):
         plt.figure()
@@ -607,14 +508,6 @@ class LocusAbc(object):
 
     @staticmethod
     def draw_minus_locus2(rgbg, rg, bg, title):
-        illuminant_x, illuminant_y = rgbg.get_illuminant()
-        illuminant_x = illuminant_x[[0, 19, 3, 5, 6]]
-        illuminant_y = illuminant_y[[0, 19, 3, 5, 6]]
-        # noinspection PyTypeChecker
-        p_opt, p_cov = opt.curve_fit(awb_locus2, illuminant_x, illuminant_y,
-                                     p0=(1, 0, 0))
-        illuminant_x += p_opt[1]
-        illuminant_y -= p_opt[2]
         plt.figure()
         plt.title(title, fontsize=20)
         plt.xticks(fontsize=18)
@@ -662,18 +555,19 @@ class LocusAbc(object):
         title = 'OV9732 & theory diff'
         x = np.array([32 / 39, 32 / 39, 32 / 66, 32 / 50, 32 / 54, 32 / 62])
         y = np.array([32 / 74, 32 / 73, 32 / 40, 32 / 66, 32 / 52, 32 / 46])
-        LocusAbc.draw_our_locus2(rgbg, x, y, title)
+        # LocusAbc.draw_our_locus2(rgbg, x, y, title)
         LocusAbc.draw_minus_locus2(rgbg, x, y, title)
         title = 'OV2710 & theory diff'
         x = np.array([32 / 26, 32 / 29, 32 / 47, 32 / 37, 32 / 40, 32 / 46])
         y = np.array([32 / 73, 32 / 69, 32 / 43, 32 / 71, 32 / 53, 32 / 46])
-        LocusAbc.draw_our_locus2(rgbg, x, y, title)
+        # LocusAbc.draw_our_locus2(rgbg, x, y, title)
         LocusAbc.draw_minus_locus2(rgbg, x, y, title)
         title = 'AR0237 & theory diff'
         x = np.array([32 / 33, 32 / 31, 32 / 54, 32 / 40, 32 / 43, 32 / 51])
         y = np.array([32 / 96, 32 / 94, 32 / 42, 32 / 71, 32 / 53, 32 / 45])
-        LocusAbc.draw_our_locus2(rgbg, x, y, title)
+        # LocusAbc.draw_our_locus2(rgbg, x, y, title)
         LocusAbc.draw_minus_locus2(rgbg, x, y, title)
+"""
 
 
 def main():
@@ -692,14 +586,14 @@ def main():
     # uv.draw()
     # xy.draw()
     # gbgr.draw()
-    # rgbg.draw()
+    rgbg.draw()
+
+    # draw_illuminant_box(xy, rgbg)
 
     # draw_daylight_cct_locus(xy)
-    # draw_sensor_awb_locus(rgbg)
-    draw_illuminant_box(xy, rgbg)
+    draw_sensor_awb_locus2(rgbg)
 
-    LocusAb.main(rgbg)
-    LocusAbc.main(rgbg)
+    # LocusAbc.main(rgbg)
 
 
 if __name__ == "__main__":
